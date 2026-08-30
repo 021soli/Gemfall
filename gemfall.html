@@ -1,0 +1,1869 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta
+  name="base:app_id"
+  content="6a9403bbcfa2c998e36b5647"
+/>
+<title>Gemfall</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap');
+
+  :root{
+    --bg1:#150f30;
+    --bg2:#2d1354;
+    --board-bg:#1d1642;
+    --board-border:#caa457;
+    --cell-empty:#2a2158;
+    --ink:#f3ecff;
+    --muted:#b6a4dd;
+    --accent:#a855f7;
+    --accent-dark:#7c3aed;
+    --gold:#e8c468;
+    --panel:#211a46;
+    --panel-border:#5b4590;
+  }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+
+  html,body{ margin:0; touch-action:pan-y; overscroll-behavior-y:contain; }
+
+  body{
+    min-height:100vh;
+    min-height:100dvh;
+    font-family:'Nunito', sans-serif;
+    background:
+      radial-gradient(circle at 80% 0%, rgba(232,196,104,0.12) 0%, transparent 42%),
+      radial-gradient(circle at 12% 88%, rgba(124,92,196,0.22) 0%, transparent 48%),
+      linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:14px 12px calc(24px + env(safe-area-inset-bottom));
+    padding-left:calc(12px + env(safe-area-inset-left));
+    padding-right:calc(12px + env(safe-area-inset-right));
+    user-select:none;
+    outline:none;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  .sparkle{
+    position:fixed;
+    width:3px; height:3px;
+    background:#fff;
+    border-radius:50%;
+    box-shadow:0 0 6px 2px rgba(255,255,255,0.55);
+    opacity:0;
+    animation:twinkle ease-in-out infinite;
+    z-index:0;
+    pointer-events:none;
+  }
+  @keyframes twinkle{
+    0%,100%{ opacity:0; transform:scale(0.5); }
+    50%{ opacity:1; transform:scale(1.2); }
+  }
+
+  h1{
+    font-family:'Cinzel', serif;
+    font-weight:800;
+    font-size:clamp(20px,5vw,26px);
+    letter-spacing:0.5px;
+    margin:2px 0 2px;
+    background:linear-gradient(180deg,#fff, var(--gold));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    z-index:1;
+  }
+  .tagline{
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:1px;
+    text-transform:uppercase;
+    margin-bottom:12px;
+    z-index:1;
+  }
+
+  .wallet-bar{ margin-bottom:12px; z-index:1; }
+  .wallet-bar .btn{ font-size:12px; padding:8px 16px; }
+  .wallet-bar .btn.connected{ border:2px solid #6bcf7f; color:#8ef0b0; }
+
+  .game-container{
+    width:100%;
+    max-width:420px;
+    margin:0 auto;
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .top-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:10px;
+    width:100%;
+    justify-content:space-between;
+    z-index:1;
+  }
+  .score-card{
+    background:var(--panel);
+    border:2px solid var(--panel-border);
+    border-radius:12px;
+    padding:6px 10px;
+    text-align:center;
+    flex:1;
+    min-width:0;
+  }
+  .score-card .label{
+    font-size:9px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+  .score-card .value{
+    font-family:'Cinzel', serif;
+    font-size:17px;
+    font-weight:700;
+    color:var(--gold);
+  }
+
+  .main-row{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    width:100%;
+    z-index:1;
+  }
+
+  .board-wrap{
+    background:var(--board-bg);
+    border:3px solid var(--board-border);
+    border-radius:14px;
+    padding:6px;
+    box-shadow:0 0 26px rgba(232,196,104,0.22), 0 10px 30px rgba(0,0,0,0.45);
+    transition:opacity .15s;
+    width:100%;
+  }
+  .board-wrap.paused{ opacity:0.35; }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(13, 1fr);
+    gap:2px;
+    width:100%;
+  }
+  .cell{
+    background:var(--cell-empty);
+    border-radius:4px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,0.04), inset 0 2px 4px rgba(0,0,0,0.35);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    line-height:1;
+    aspect-ratio:1/1;
+  }
+  .cell.filled{
+    box-shadow:
+      inset 0 -3px 0 rgba(0,0,0,0.28),
+      inset 0 3px 0 rgba(255,255,255,0.35),
+      inset 0 0 10px rgba(255,255,255,0.08);
+  }
+  .cell.ghost{
+    box-shadow:inset 0 0 0 2px rgba(232,196,104,0.55), inset 0 0 14px rgba(232,196,104,0.25);
+  }
+  .cell.clearing{
+    animation:clearFlash .3s ease;
+  }
+  @keyframes clearFlash{
+    0%{ box-shadow:inset 0 0 0 100px #fff; }
+    100%{ box-shadow:inset 0 0 0 100px rgba(255,255,255,0); }
+  }
+  .cell.bomb-block{ animation:bombPulse .5s ease-in-out infinite; }
+  @keyframes bombPulse{
+    0%,100%{ box-shadow:inset 0 0 0 2px rgba(255,110,90,0.9), 0 0 10px rgba(255,110,90,0.6); }
+    50%{ box-shadow:inset 0 0 0 2px rgba(255,190,90,0.9), 0 0 18px rgba(255,150,60,0.85); }
+  }
+  .cell.bomb-hit{ animation:bombFlash .3s ease; }
+  @keyframes bombFlash{
+    0%{ box-shadow:inset 0 0 0 100px rgba(255,130,60,0.9); }
+    100%{ box-shadow:inset 0 0 0 100px rgba(255,130,60,0); }
+  }
+  .cell.rainbow-block{ animation:rainbowHue 1.1s linear infinite; }
+  @keyframes rainbowHue{ 0%{ filter:hue-rotate(0deg); } 100%{ filter:hue-rotate(360deg); } }
+
+  .particle{
+    position:fixed;
+    width:6px; height:6px;
+    border-radius:2px;
+    z-index:250;
+    pointer-events:none;
+    animation:particleBurst .6s ease-out forwards;
+  }
+  @keyframes particleBurst{
+    0%{ transform:translate(-50%,-50%) scale(1); opacity:1; }
+    100%{ transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.3); opacity:0; }
+  }
+
+  .board-wrap.shake{ animation:shakeAnim .35s ease; }
+  @keyframes shakeAnim{
+    0%,100%{ transform:translate(0,0); }
+    20%{ transform:translate(-6px,3px); }
+    40%{ transform:translate(6px,-3px); }
+    60%{ transform:translate(-4px,2px); }
+    80%{ transform:translate(4px,-2px); }
+  }
+
+  .toast{
+    position:fixed;
+    top:14px;
+    left:50%;
+    transform:translate(-50%,-14px);
+    background:var(--panel);
+    border:2px solid var(--gold);
+    color:var(--gold);
+    font-family:'Cinzel', serif;
+    font-weight:700;
+    font-size:14px;
+    padding:8px 18px;
+    border-radius:12px;
+    opacity:0;
+    transition:opacity .22s, transform .22s;
+    z-index:400;
+    pointer-events:none;
+    white-space:nowrap;
+  }
+  .toast.show{ opacity:1; transform:translate(-50%,0); }
+
+  .side{
+    display:flex;
+    flex-direction:row;
+    flex-wrap:wrap;
+    gap:8px;
+    width:100%;
+    margin-top:10px;
+    justify-content:center;
+    z-index:1;
+  }
+  .side .next-box{ flex:1 1 80px; }
+  .side .btn{ width:auto; flex:1 1 110px; padding:10px 4px; font-size:12px; min-height:42px; }
+  .next-box{
+    background:var(--panel);
+    border:2px solid var(--panel-border);
+    border-radius:12px;
+    padding:8px;
+    text-align:center;
+  }
+  .next-box .label{
+    font-size:9px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    margin-bottom:6px;
+  }
+  .next-piece-holder{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:56px;
+  }
+  .mini-piece{ position:relative; }
+  .mini-block{
+    position:absolute;
+    border-radius:3px;
+    box-shadow:
+      inset 0 -2px 0 rgba(0,0,0,0.22),
+      inset 0 2px 0 rgba(255,255,255,0.3);
+  }
+
+  .touch-controls{
+    margin-top:14px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    z-index:1;
+  }
+  .row-btns{ display:flex; gap:10px; }
+  .ctrl-btn{
+    width:52px;
+    height:44px;
+    border-radius:12px;
+    border:2px solid var(--panel-border);
+    background:var(--panel);
+    color:var(--ink);
+    font-size:18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    touch-action:none;
+  }
+  .ctrl-btn:active{ background:linear-gradient(135deg,#caa457,#8a6b2f); border-color:var(--gold); box-shadow:0 0 12px rgba(232,196,104,0.4); }
+  .ctrl-btn.hold{ background:linear-gradient(135deg,#8a4fd1,#5b2f96); border-color:var(--gold); }
+  .ctrl-btn.drop{ background:linear-gradient(135deg,#d1345c,#8a1f3c); border-color:var(--gold); }
+
+  .btn{
+    font-family:'Nunito';
+    font-weight:700;
+    font-size:13px;
+    border:none;
+    border-radius:10px;
+    padding:8px 14px;
+    cursor:pointer;
+  }
+  .btn:active{transform:scale(.95);}
+  .btn-primary{ background:linear-gradient(135deg, var(--accent), var(--accent-dark)); color:#fff; box-shadow:0 3px 0 var(--accent-dark), 0 0 14px rgba(168,85,247,0.35); }
+  .btn-ghost{ background:var(--panel); color:var(--ink); border:2px solid var(--panel-border); }
+
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(15,16,34,0.8);
+    display:none; align-items:center; justify-content:center;
+    z-index:300;
+  }
+  .overlay.show{ display:flex; }
+  .overlay-card{
+    background:var(--panel);
+    border:3px solid var(--gold);
+    border-radius:20px;
+    padding:26px 28px;
+    text-align:center;
+    max-width:270px;
+    box-shadow:0 0 30px rgba(232,196,104,0.25);
+  }
+  .overlay-card h2{
+    font-family:'Cinzel', serif;
+    margin:0 0 6px;
+    font-size:22px;
+    color:var(--gold);
+  }
+  .overlay-card p{ margin:4px 0 16px; color:var(--muted); font-size:13px;}
+  .overlay-card .final-score{
+    font-family:'Cinzel', serif;
+    font-size:32px;
+    color:#fff;
+  }
+
+  footer{margin-top:16px;font-size:10px;color:var(--muted);}
+
+  .guide-list{ text-align:left; margin-top:10px; font-size:13px; color:var(--ink); line-height:1.9; }
+  .guide-list .g-row{ display:flex; gap:10px; align-items:center; padding:3px 0; }
+  .guide-list .g-key{ min-width:64px; color:var(--gold); font-weight:700; font-size:12px; }
+  .guide-list .g-desc{ color:var(--muted); font-size:12px; }
+
+  .btn-share{ background:linear-gradient(135deg,#e8c468,#b98f3a); color:#2a1a00; box-shadow:0 3px 0 #8a6b2f; }
+
+  .mode-tabs{
+    display:flex;
+    gap:6px;
+    margin-bottom:10px;
+    z-index:1;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .mode-tab{
+    font-family:'Nunito';
+    font-weight:700;
+    font-size:11px;
+    padding:9px 12px;
+    min-height:38px;
+    border-radius:10px;
+    border:2px solid var(--panel-border);
+    background:var(--panel);
+    color:var(--muted);
+    cursor:pointer;
+  }
+  .mode-tab.active{
+    border-color:var(--gold);
+    color:var(--gold);
+    background:linear-gradient(135deg,#3a2c66,#241b4a);
+  }
+
+  .achv-list{
+    max-height:50vh;
+    overflow-y:auto;
+    text-align:left;
+    margin-top:10px;
+  }
+  .achv-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 6px;
+    border-bottom:1px solid var(--panel-border);
+    opacity:0.4;
+  }
+  .achv-row.unlocked{ opacity:1; }
+  .achv-icon{ font-size:20px; width:26px; text-align:center; }
+  .achv-title{ font-size:13px; font-weight:700; color:var(--ink); }
+  .achv-desc{ font-size:11px; color:var(--muted); }
+
+  .leaderboard-list{
+    text-align:left;
+    margin:10px 0 4px;
+    font-size:13px;
+  }
+  .leaderboard-list .lb-row{
+    display:flex;
+    justify-content:space-between;
+    padding:4px 2px;
+    color:var(--muted);
+  }
+  .leaderboard-list .lb-row.me{ color:var(--gold); font-weight:700; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+</head>
+<body tabindex="0">
+
+<div class="sparkle" style="top:8%; left:12%; animation-duration:3.2s; animation-delay:0s;"></div>
+<div class="sparkle" style="top:14%; left:82%; animation-duration:4.1s; animation-delay:0.6s;"></div>
+<div class="sparkle" style="top:35%; left:6%; animation-duration:3.6s; animation-delay:1.2s;"></div>
+<div class="sparkle" style="top:60%; left:90%; animation-duration:4.6s; animation-delay:0.3s;"></div>
+<div class="sparkle" style="top:80%; left:15%; animation-duration:3.9s; animation-delay:1.6s;"></div>
+<div class="sparkle" style="top:92%; left:75%; animation-duration:3.4s; animation-delay:0.9s;"></div>
+
+<h1>💎 Gemfall</h1>
+<div class="tagline">An Arcane Gem-Stacking Saga</div>
+
+<div class="wallet-bar">
+  <button class="btn btn-ghost" id="walletBtn">🔗 Connect Wallet</button>
+</div>
+
+<div class="game-container">
+
+<div class="mode-tabs" id="modeTabs">
+  <button class="mode-tab active" data-mode="marathon">Marathon</button>
+  <button class="mode-tab" data-mode="sprint">Sprint 40L</button>
+  <button class="mode-tab" data-mode="obstacles">Endless+</button>
+</div>
+
+<div class="top-row">
+  <div class="score-card"><div class="label">Score</div><div class="value" id="score">0</div></div>
+  <div class="score-card"><div class="label">Best</div><div class="value" id="best">0</div></div>
+  <div class="score-card"><div class="label">Lines</div><div class="value" id="lines">0</div></div>
+  <div class="score-card"><div class="label" id="levelLabel">Level</div><div class="value" id="level">1</div></div>
+</div>
+
+<div class="main-row">
+  <div class="board-wrap" id="boardWrap">
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="side">
+    <div class="next-box">
+      <div class="label">Hold</div>
+      <div class="next-piece-holder" id="holdHolder"></div>
+    </div>
+    <div class="next-box">
+      <div class="label">Next</div>
+      <div class="next-piece-holder" id="nextHolder"></div>
+    </div>
+    <button class="btn btn-ghost" id="pauseBtn">Pause</button>
+    <button class="btn btn-ghost" id="restartBtn">Restart</button>
+    <button class="btn btn-ghost" id="soundBtn">🔊 Sound</button>
+    <button class="btn btn-ghost" id="musicBtn">🎵 Music</button>
+    <button class="btn btn-ghost" id="achvBtn">🏅 Achievements</button>
+    <button class="btn btn-ghost" id="themeBtn">🎨 Themes</button>
+    <button class="btn btn-ghost" id="guideBtn">❓ How to Play</button>
+  </div>
+</div>
+
+<div class="touch-controls">
+  <div class="row-btns">
+    <button class="ctrl-btn" id="rotateBtn">⟳</button>
+  </div>
+  <div class="row-btns">
+    <button class="ctrl-btn" id="leftBtn">◀</button>
+    <button class="ctrl-btn" id="downBtn">▼</button>
+    <button class="ctrl-btn" id="rightBtn">▶</button>
+  </div>
+  <div class="row-btns">
+    <button class="ctrl-btn hold" id="holdBtn" style="width:80px;font-size:13px;">Hold</button>
+    <button class="ctrl-btn drop" id="dropBtn" style="width:130px;font-size:13px;">⤓ Hard Drop</button>
+  </div>
+</div>
+
+</div><!-- /game-container -->
+
+<div class="overlay" id="overlay">
+  <div class="overlay-card">
+    <h2 id="overlayTitle">Game Over</h2>
+    <div class="final-score" id="finalScore">0</div>
+    <p id="overlayMsg">Better luck next time!</p>
+    <div class="leaderboard-list" id="leaderboardList"></div>
+    <button class="btn btn-primary" id="playAgainBtn">Play Again</button>
+    <button class="btn btn-share" id="shareBtn" style="margin-top:8px;">📤 Share Score</button>
+  </div>
+</div>
+
+<div class="overlay" id="achvOverlay">
+  <div class="overlay-card">
+    <h2>Achievements</h2>
+    <div class="achv-list" id="achvList"></div>
+    <button class="btn btn-primary" id="achvCloseBtn" style="margin-top:12px;">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="guideOverlay">
+  <div class="overlay-card">
+    <h2>💎 How to Play</h2>
+    <div class="guide-list">
+      <div class="g-row"><div class="g-key">◀ ▶</div><div class="g-desc">Move left / right</div></div>
+      <div class="g-row"><div class="g-key">⟳ / ↑</div><div class="g-desc">Rotate the piece</div></div>
+      <div class="g-row"><div class="g-key">▼ / ↓</div><div class="g-desc">Soft drop</div></div>
+      <div class="g-row"><div class="g-key">⤓ / Space</div><div class="g-desc">Hard drop</div></div>
+      <div class="g-row"><div class="g-key">Hold / C</div><div class="g-desc">Swap the current piece</div></div>
+      <div class="g-row"><div class="g-key">💣 Bomb</div><div class="g-desc">Blasts a 3×3 area on lock</div></div>
+      <div class="g-row"><div class="g-key">🌈 Rainbow</div><div class="g-desc">Auto-fills its row on lock</div></div>
+      <div class="g-row"><div class="g-key">Combos</div><div class="g-desc">Chain clears for bonus points</div></div>
+      <div class="g-row"><div class="g-key">T-Spins</div><div class="g-desc">Rotate a T into a tight slot for big points</div></div>
+    </div>
+    <button class="btn btn-primary" id="guideCloseBtn" style="margin-top:14px;">Got it, let's play!</button>
+  </div>
+</div>
+
+<div class="overlay" id="themeOverlay">
+  <div class="overlay-card">
+    <h2>🎨 Themes</h2>
+    <div class="achv-list" id="themeList"></div>
+    <button class="btn btn-primary" id="themeCloseBtn" style="margin-top:12px;">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="dailyGateOverlay">
+  <div class="overlay-card">
+    <h2>☀️ Daily Check-In</h2>
+    <p style="color:var(--muted); font-size:13px; margin:6px 0 16px; line-height:1.6;">Connect your wallet and send today's free check-in transaction to start playing. One check-in unlocks the whole day.</p>
+    <button class="btn btn-ghost" id="gateConnectBtn" style="width:100%; margin-bottom:8px;">🔗 Connect Wallet</button>
+    <button class="btn btn-primary" id="gateCheckinBtn" style="width:100%;" disabled>📝 Send Daily Check-In</button>
+    <button class="btn btn-ghost" id="gateSkipBtn" style="width:100%; margin-top:14px; font-size:11px; opacity:0.7;">Skip for now — play without wallet</button>
+  </div>
+</div>
+
+<footer>Arrow keys / buttons to move · Up or ⟳ to rotate · Space or ⤓ to hard drop · C or Hold to swap<br>If arrow keys don't respond, click/tap anywhere on the page once first.</footer>
+
+<script>
+const COLS = 13, ROWS = 16;
+
+// The board's pixel width is the only thing computed in JS — everything else
+// (column width, cell squareness, gaps) is handled by CSS grid + aspect-ratio,
+// which is far less error-prone than manually computing per-cell pixel sizes.
+const SHAPES = {
+  I: { m:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color:'linear-gradient(135deg, #8fd3ff, #2f6fb5)' },
+  O: { m:[[1,1],[1,1]], color:'linear-gradient(135deg, #ffe08a, #d8a530)' },
+  T: { m:[[0,1,0],[1,1,1],[0,0,0]], color:'linear-gradient(135deg, #d9a8ff, #8a4fd1)' },
+  S: { m:[[0,1,1],[1,1,0],[0,0,0]], color:'linear-gradient(135deg, #9df3bd, #2f9e63)' },
+  Z: { m:[[1,1,0],[0,1,1],[0,0,0]], color:'linear-gradient(135deg, #ff9aac, #d1345c)' },
+  J: { m:[[1,0,0],[1,1,1],[0,0,0]], color:'linear-gradient(135deg, #9df3ea, #2fa39a)' },
+  L: { m:[[0,0,1],[1,1,1],[0,0,0]], color:'linear-gradient(135deg, #ffc98a, #d97f2f)' },
+};
+const TYPE_KEYS = Object.keys(SHAPES);
+
+// Rare power-up pieces, sprinkled in on top of the fair 7-bag: a Bomb (blasts
+// a 3x3 area on lock) and a Rainbow (auto-fills gaps in its row on lock).
+const SPECIAL_SHAPES = {
+  BOMB: { m:[[1]], color:'linear-gradient(135deg, #ff9a6a, #d1345c)' },
+  RAINBOW: { m:[[1]], color:'linear-gradient(90deg,#ff8fa3,#ffd166,#8ef0b0,#8fd3ff,#d9a8ff)' },
+};
+function shapeDef(type){ return SHAPES[type] || SPECIAL_SHAPES[type]; }
+
+// ---- Unlockable visual themes (tied to achievements) ----
+const THEMES = {
+  arcane: {
+    label: 'Arcane', unlocked: true,
+    vars: { '--bg1':'#150f30','--bg2':'#2d1354','--board-bg':'#1d1642','--board-border':'#caa457','--cell-empty':'#2a2158','--accent':'#a855f7','--accent-dark':'#7c3aed','--gold':'#e8c468','--panel':'#211a46','--panel-border':'#5b4590' },
+    blocks: { I:'linear-gradient(135deg, #8fd3ff, #2f6fb5)', O:'linear-gradient(135deg, #ffe08a, #d8a530)', T:'linear-gradient(135deg, #d9a8ff, #8a4fd1)', S:'linear-gradient(135deg, #9df3bd, #2f9e63)', Z:'linear-gradient(135deg, #ff9aac, #d1345c)', J:'linear-gradient(135deg, #9df3ea, #2fa39a)', L:'linear-gradient(135deg, #ffc98a, #d97f2f)' }
+  },
+  frost: {
+    label: 'Frostfall', unlockedBy: 'level10',
+    vars: { '--bg1':'#0c1f33','--bg2':'#123a52','--board-bg':'#0f2a40','--board-border':'#bfe8ff','--cell-empty':'#183c56','--accent':'#4fc3f7','--accent-dark':'#1f8fc4','--gold':'#bfe8ff','--panel':'#123048','--panel-border':'#2f6d90' },
+    blocks: { I:'linear-gradient(135deg,#e3f8ff,#7ec8ff)', O:'linear-gradient(135deg,#eafcff,#a8e6ff)', T:'linear-gradient(135deg,#d3f1ff,#5aa9e6)', S:'linear-gradient(135deg,#c6f2ff,#4fc3f7)', Z:'linear-gradient(135deg,#ffe3ee,#ff9ac8)', J:'linear-gradient(135deg,#e8ffff,#7ee8e0)', L:'linear-gradient(135deg,#f0faff,#9fd8ff)' }
+  },
+  infernal: {
+    label: 'Infernal', unlockedBy: 'tetris',
+    vars: { '--bg1':'#210a0a','--bg2':'#4a1210','--board-bg':'#2a0d0d','--board-border':'#ff9a4d','--cell-empty':'#3a1414','--accent':'#ff6b3d','--accent-dark':'#c23f1a','--gold':'#ffb347','--panel':'#331111','--panel-border':'#7a2b1c' },
+    blocks: { I:'linear-gradient(135deg,#ffcf8a,#ff7a3d)', O:'linear-gradient(135deg,#ffe08a,#ff9a1f)', T:'linear-gradient(135deg,#ff9a6a,#c2331a)', S:'linear-gradient(135deg,#ffb37a,#d1345c)', Z:'linear-gradient(135deg,#ff6b6b,#7a1010)', J:'linear-gradient(135deg,#ffd39a,#d9691f)', L:'linear-gradient(135deg,#ffbe6a,#a8391a)' }
+  }
+};
+let currentTheme = 'arcane';
+try{ currentTheme = localStorage.getItem('gemfallTheme') || 'arcane'; }catch(e){}
+
+function isThemeUnlocked(key){
+  const t = THEMES[key];
+  return !!t.unlocked || (t.unlockedBy && stats.unlocked[t.unlockedBy]);
+}
+
+function applyTheme(key, skipRender){
+  if(!isThemeUnlocked(key)) return;
+  currentTheme = key;
+  try{ localStorage.setItem('gemfallTheme', key); }catch(e){}
+  const t = THEMES[key];
+  Object.entries(t.vars).forEach(([k,v])=>document.documentElement.style.setProperty(k, v));
+  Object.entries(t.blocks).forEach(([type,color])=>{ SHAPES[type].color = color; });
+  if(!skipRender && cellEls && cellEls.length){
+    render();
+    renderNext();
+    renderHold();
+  }
+  renderThemeList();
+}
+
+function renderThemeList(){
+  const el = document.getElementById('themeList');
+  if(!el) return;
+  el.innerHTML = '';
+  Object.entries(THEMES).forEach(([key, t])=>{
+    const unlocked = isThemeUnlocked(key);
+    const row = document.createElement('div');
+    row.className = 'achv-row' + (unlocked ? ' unlocked' : '');
+    row.style.cursor = unlocked ? 'pointer' : 'default';
+    const reqAch = t.unlockedBy ? ACHIEVEMENTS.find(a=>a.id===t.unlockedBy) : null;
+    const reqText = t.unlocked ? 'Always available' : ('Unlock: ' + (reqAch ? reqAch.title : t.unlockedBy));
+    row.innerHTML = `<div class="achv-icon">${key===currentTheme ? '✅' : '🎨'}</div><div><div class="achv-title">${t.label}</div><div class="achv-desc">${unlocked ? reqText : '🔒 ' + reqText}</div></div>`;
+    if(unlocked) row.addEventListener('click', ()=>applyTheme(key));
+    el.appendChild(row);
+  });
+}
+
+let board, cellEls, active, nextType, score, best, lines, level, dropInterval, timer, paused, gameOver;
+let bag = [];
+let holdType = null, canHold = true;
+let lockTimer = null, lockResets = 0;
+let combo = -1, lastActionRotate = false, animating = false;
+let currentMode = 'marathon';
+let sprintStartTime = 0, sprintInterval = null;
+let obstacleInterval = null;
+const LOCK_DELAY = 450;
+const MAX_LOCK_RESETS = 12;
+
+const gridEl = document.getElementById('grid');
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const linesEl = document.getElementById('lines');
+const levelEl = document.getElementById('level');
+const nextHolder = document.getElementById('nextHolder');
+const holdHolder = document.getElementById('holdHolder');
+const overlayEl = document.getElementById('overlay');
+const finalScoreEl = document.getElementById('finalScore');
+const overlayTitle = document.getElementById('overlayTitle');
+const overlayMsg = document.getElementById('overlayMsg');
+const pauseBtn = document.getElementById('pauseBtn');
+const soundBtn = document.getElementById('soundBtn');
+const musicBtn = document.getElementById('musicBtn');
+
+try{ best = parseInt(localStorage.getItem('fallingBlocksBest') || '0', 10) || 0; }catch(e){ best = 0; }
+bestEl.textContent = best;
+
+// ---- Sound (Web Audio, no asset files — plain tones) ----
+let soundOn = true;
+try{ soundOn = localStorage.getItem('fallingBlocksSound') !== 'off'; }catch(e){}
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  } else if(audioCtx.state === 'suspended'){
+    audioCtx.resume();
+  }
+}
+function beep(freq, dur, type, vol){
+  if(!soundOn) return;
+  ensureAudio();
+  if(!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'square';
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(vol || 0.09, t0);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+function sfxMove(){ beep(220, 0.045, 'square', 0.05); }
+function sfxRotate(){ beep(330, 0.06, 'square', 0.07); }
+function sfxLock(){ beep(140, 0.09, 'square', 0.09); }
+function sfxHold(){ beep(440, 0.05, 'triangle', 0.06); }
+function sfxHardDrop(){ beep(110, 0.12, 'square', 0.1); }
+function sfxLineClear(n){
+  const freqs = [523, 659, 784, 988];
+  for(let i=0;i<n;i++){
+    setTimeout(()=>beep(freqs[Math.min(i, freqs.length-1)], 0.12, 'triangle', 0.09), i*70);
+  }
+}
+function sfxTspin(){ beep(600, 0.15, 'sawtooth', 0.08); setTimeout(()=>beep(800, 0.15, 'sawtooth', 0.08), 90); }
+function sfxLevelUp(){ beep(660, 0.1, 'triangle', 0.08); setTimeout(()=>beep(880, 0.15, 'triangle', 0.09), 100); }
+function sfxGameOver(){ [440,330,220,140].forEach((f,i)=>setTimeout(()=>beep(f, 0.18, 'sawtooth', 0.08), i*140)); }
+function sfxBomb(){ beep(90, 0.2, 'sawtooth', 0.14); setTimeout(()=>beep(60, 0.25, 'sawtooth', 0.1), 60); }
+function sfxRainbow(){ [523,659,784,988,1175].forEach((f,i)=>setTimeout(()=>beep(f,0.1,'sine',0.07), i*45)); }
+function sfxAchievement(){ beep(784,0.1,'triangle',0.09); setTimeout(()=>beep(988,0.1,'triangle',0.09),100); setTimeout(()=>beep(1318,0.18,'triangle',0.1),200); }
+
+function toggleSound(){
+  soundOn = !soundOn;
+  try{ localStorage.setItem('fallingBlocksSound', soundOn ? 'on' : 'off'); }catch(e){}
+  soundBtn.textContent = soundOn ? '🔊 Sound' : '🔇 Muted';
+  if(soundOn) ensureAudio();
+}
+soundBtn.textContent = soundOn ? '🔊 Sound' : '🔇 Muted';
+soundBtn.addEventListener('click', toggleSound);
+
+// ---- Ambient background music (procedural pad, no audio files) ----
+let musicOn = true;
+try{ musicOn = localStorage.getItem('fallingBlocksMusic') !== 'off'; }catch(e){}
+let musicNodes = null;
+
+function startMusic(){
+  if(!musicOn || musicNodes) return;
+  ensureAudio();
+  if(!audioCtx) return;
+  const masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.035;
+  masterGain.connect(audioCtx.destination);
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 900;
+  filter.connect(masterGain);
+  const freqs = [220, 261.63, 329.63, 392]; // soft Am7-ish pad
+  const voices = freqs.map((f,i)=>{
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = f;
+    const g = audioCtx.createGain();
+    g.gain.value = 0;
+    osc.connect(g);
+    g.connect(filter);
+    osc.start();
+    const dur = 6.5 + i*1.4;
+    function loopEnvelope(){
+      const t = audioCtx.currentTime;
+      g.gain.cancelScheduledValues(t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.22, t + dur*0.4);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    }
+    loopEnvelope();
+    const interval = setInterval(loopEnvelope, dur*1000);
+    return { osc, g, interval };
+  });
+  musicNodes = { masterGain, filter, voices };
+}
+
+function stopMusic(){
+  if(!musicNodes) return;
+  musicNodes.voices.forEach(v=>{
+    clearInterval(v.interval);
+    try{ v.osc.stop(); }catch(e){}
+  });
+  musicNodes = null;
+}
+
+function toggleMusic(){
+  musicOn = !musicOn;
+  try{ localStorage.setItem('fallingBlocksMusic', musicOn ? 'on' : 'off'); }catch(e){}
+  musicBtn.textContent = musicOn ? '🎵 Music' : '🔇 Music Off';
+  if(musicOn) startMusic(); else stopMusic();
+}
+musicBtn.textContent = musicOn ? '🎵 Music' : '🔇 Music Off';
+musicBtn.addEventListener('click', toggleMusic);
+
+// Browsers require a user gesture before audio can start — kick off ambient
+// music on the very first tap/click/keypress anywhere on the page.
+function initAudioOnce(){
+  ensureAudio();
+  startMusic();
+  window.removeEventListener('pointerdown', initAudioOnce);
+  window.removeEventListener('keydown', initAudioOnce);
+}
+window.addEventListener('pointerdown', initAudioOnce, { once:true });
+window.addEventListener('keydown', initAudioOnce, { once:true });
+
+// ---- Toast messages (Combo / T-Spin / Level Up / Tetris) ----
+function showToast(text){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = text;
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>t.classList.add('show'));
+  setTimeout(()=>{
+    t.classList.remove('show');
+    setTimeout(()=>t.remove(), 250);
+  }, 1100);
+}
+
+// ---- Juice: particle bursts + screen shake for big moments ----
+function spawnParticles(r, c, colors){
+  const rect = gridEl.getBoundingClientRect();
+  const cellW = rect.width / COLS;
+  const cellH = rect.height / ROWS;
+  const x = rect.left + (c+0.5)*cellW;
+  const y = rect.top + (r+0.5)*cellH;
+  const palette = colors || ['#e8c468','#d9a8ff','#8fd3ff','#9df3bd','#ff9aac'];
+  const count = 16;
+  for(let i=0;i<count;i++){
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = Math.random()*Math.PI*2;
+    const dist = 30 + Math.random()*55;
+    p.style.left = x+'px';
+    p.style.top = y+'px';
+    p.style.background = palette[Math.floor(Math.random()*palette.length)];
+    p.style.setProperty('--dx', (Math.cos(angle)*dist)+'px');
+    p.style.setProperty('--dy', (Math.sin(angle)*dist)+'px');
+    document.body.appendChild(p);
+    setTimeout(()=>p.remove(), 650);
+  }
+}
+function triggerShake(){
+  const bw = document.getElementById('boardWrap');
+  bw.classList.remove('shake');
+  void bw.offsetWidth;
+  bw.classList.add('shake');
+}
+
+// ---- Lifetime stats + Achievements ----
+function loadStats(){
+  try{
+    const raw = JSON.parse(localStorage.getItem('fallingBlocksStats'));
+    if(raw) return Object.assign(defaultStats(), raw);
+  }catch(e){}
+  return defaultStats();
+}
+function defaultStats(){
+  return { totalLinesLifetime:0, maxCombo:0, maxLevel:1, bestScoreEver:0, gotTetris:false, gotTSpin:false, usedBomb:false, usedRainbow:false, unlocked:{} };
+}
+let stats = loadStats();
+function saveStats(){ try{ localStorage.setItem('fallingBlocksStats', JSON.stringify(stats)); }catch(e){} }
+
+const ACHIEVEMENTS = [
+  { id:'first_clear', icon:'🎯', title:'First Clear', desc:'Clear your first line', check:(s)=>s.totalLinesLifetime>=1 },
+  { id:'tetris', icon:'🔥', title:'Tetris Master', desc:'Clear 4 lines at once', check:(s)=>s.gotTetris },
+  { id:'tspin', icon:'🌀', title:'Spin Doctor', desc:'Land a T-Spin', check:(s)=>s.gotTSpin },
+  { id:'bomb', icon:'💥', title:'Demolition', desc:'Detonate a bomb piece', check:(s)=>s.usedBomb },
+  { id:'rainbow', icon:'🌈', title:'Over the Rainbow', desc:'Lock a rainbow piece', check:(s)=>s.usedRainbow },
+  { id:'combo5', icon:'⛓️', title:'Combo King', desc:'Reach a combo of x5', check:(s)=>s.maxCombo>=5 },
+  { id:'level10', icon:'🏔️', title:'High Climber', desc:'Reach level 10', check:(s)=>s.maxLevel>=10 },
+  { id:'score5000', icon:'💯', title:'High Roller', desc:'Score 5000+ in one game', check:(s)=>s.bestScoreEver>=5000 },
+  { id:'lines100', icon:'🏆', title:'Perfectionist', desc:'Clear 100 lines total, lifetime', check:(s)=>s.totalLinesLifetime>=100 },
+];
+
+function checkAchievements(){
+  ACHIEVEMENTS.forEach(a=>{
+    if(!stats.unlocked[a.id] && a.check(stats)){
+      stats.unlocked[a.id] = true;
+      showToast('🏅 ' + a.title + '!');
+      sfxAchievement();
+    }
+  });
+  saveStats();
+}
+
+function renderAchievements(){
+  const listEl = document.getElementById('achvList');
+  listEl.innerHTML = '';
+  ACHIEVEMENTS.forEach(a=>{
+    const row = document.createElement('div');
+    row.className = 'achv-row' + (stats.unlocked[a.id] ? ' unlocked' : '');
+    row.innerHTML = `<div class="achv-icon">${a.icon}</div><div><div class="achv-title">${a.title}</div><div class="achv-desc">${a.desc}</div></div>`;
+    listEl.appendChild(row);
+  });
+}
+
+// ---- Local leaderboard (top 5, per browser) ----
+function loadLeaderboard(){
+  try{ return JSON.parse(localStorage.getItem('fallingBlocksLeaderboard')) || []; }catch(e){ return []; }
+}
+function saveLeaderboardEntry(finalScore, modeLabel){
+  const board = loadLeaderboard();
+  const entry = { score:finalScore, mode:modeLabel, date:new Date().toLocaleDateString() };
+  board.push(entry);
+  board.sort((a,b)=>b.score-a.score);
+  const top = board.slice(0,5);
+  try{ localStorage.setItem('fallingBlocksLeaderboard', JSON.stringify(top)); }catch(e){}
+  return { top, rank: top.indexOf(entry) };
+}
+function renderLeaderboardList(top, meIndex){
+  const el = document.getElementById('leaderboardList');
+  if(!top.length){ el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="color:var(--gold); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Local Leaderboard</div>' +
+    top.map((e,i)=>`<div class="lb-row${i===meIndex?' me':''}">#${i+1} · ${e.mode||'Marathon'}<span>${e.score}</span></div>`).join('');
+}
+
+// ---- Share result ----
+function buildShareText(){
+  const modeLabel = currentMode === 'sprint' ? 'Sprint' : currentMode === 'obstacles' ? 'Endless+' : 'Marathon';
+  let text = `💎 Gemfall — ${modeLabel}\nScore: ${score} · Lines: ${lines}`;
+  if(currentMode === 'sprint') text += ` · Time: ${formatTime(Date.now()-sprintStartTime)}`;
+  text += `\nCan you beat it?`;
+  return text;
+}
+async function shareResult(){
+  const text = buildShareText();
+  if(navigator.share){
+    try{ await navigator.share({ text }); return; }catch(e){ /* cancelled or unsupported, fall through */ }
+  }
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast('📋 Copied to clipboard!');
+  }catch(e){
+    showToast("Couldn't share — copy manually");
+  }
+}
+document.getElementById('shareBtn').addEventListener('click', shareResult);
+
+// ---- Wallet connect (EIP-1193 — MetaMask, Coinbase Wallet, Base App's in-app browser, etc.) ----
+let walletAddress = null;
+const walletBtn = document.getElementById('walletBtn');
+
+function shortAddr(addr){ return addr.slice(0,6) + '…' + addr.slice(-4); }
+
+function updateWalletUI(){
+  if(walletAddress){
+    walletBtn.textContent = '🟢 ' + shortAddr(walletAddress);
+    walletBtn.classList.add('connected');
+  } else {
+    walletBtn.textContent = '🔗 Connect Wallet';
+    walletBtn.classList.remove('connected');
+  }
+}
+
+async function connectWallet(){
+  if(!window.ethereum){
+    showToast('No wallet found in this browser');
+    return;
+  }
+  try{
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    if(accounts && accounts.length){
+      walletAddress = accounts[0];
+      updateWalletUI();
+      showToast('🔗 Wallet connected');
+    }
+  }catch(e){
+    showToast('Wallet connection declined');
+  }
+}
+
+walletBtn.addEventListener('click', ()=>{
+  if(walletAddress){
+    // Injected wallets don't offer a real programmatic disconnect — this just
+    // clears the app's own display state; the site stays authorized until
+    // the user revokes it from their wallet.
+    walletAddress = null;
+    updateWalletUI();
+    showToast('Wallet disconnected');
+  } else {
+    connectWallet();
+  }
+});
+
+if(window.ethereum){
+  // Reflect an already-authorized connection without prompting.
+  window.ethereum.request({ method: 'eth_accounts' }).then(accounts=>{
+    if(accounts && accounts.length){
+      walletAddress = accounts[0];
+      updateWalletUI();
+    }
+  }).catch(()=>{}).finally(startupCheck);
+  if(window.ethereum.on){
+    window.ethereum.on('accountsChanged', (accounts)=>{
+      walletAddress = (accounts && accounts.length) ? accounts[0] : null;
+      updateWalletUI();
+      updateGateUI();
+    });
+  }
+} else {
+  Promise.resolve().then(startupCheck);
+}
+
+// ---- Deployed contract (GemfallCheckIn, Base Mainnet) ----
+const CONTRACT_ADDRESS = '0x106823c071c7cc0f30d4b6942d80ee36687dfb8b';
+const CONTRACT_ABI = [
+  'function checkIn() external',
+  'function hasCheckedInToday(address player) view returns (bool)',
+  'function streak(address) view returns (uint256)',
+  'function totalCheckIns(address) view returns (uint256)'
+];
+
+const BASE_MAINNET_CHAIN_ID = '0x2105'; // 8453
+const BASE_MAINNET_PARAMS = {
+  chainId: BASE_MAINNET_CHAIN_ID,
+  chainName: 'Base',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: ['https://mainnet.base.org'],
+  blockExplorerUrls: ['https://basescan.org']
+};
+
+// Prompts the wallet to switch to (or add) Base Mainnet if it's on the wrong
+// chain — worth checking explicitly since check-ins now spend real gas.
+async function ensureBaseMainnet(){
+  if(!window.ethereum) return false;
+  try{
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    if(chainId === BASE_MAINNET_CHAIN_ID) return true;
+    try{
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: BASE_MAINNET_CHAIN_ID }]
+      });
+      return true;
+    }catch(switchErr){
+      if(switchErr && switchErr.code === 4902){
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [BASE_MAINNET_PARAMS]
+        });
+        return true;
+      }
+      throw switchErr;
+    }
+  }catch(e){
+    showToast('Please switch your wallet to Base Mainnet');
+    return false;
+  }
+}
+
+async function getContract(){
+  if(!window.ethers || !window.ethereum || !walletAddress) return null;
+  try{
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+  }catch(e){
+    return null;
+  }
+}
+
+// ---- Daily check-in (required once per day to start playing) ----
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function dailyKey(){ return 'gemfallDailyTx_' + (walletAddress || 'none'); }
+function isDailyDoneLocal(){
+  if(!walletAddress) return false;
+  try{ return localStorage.getItem(dailyKey()) === todayStr(); }catch(e){ return false; }
+}
+function markDailyDone(){
+  try{ localStorage.setItem(dailyKey(), todayStr()); }catch(e){}
+}
+
+// Authoritative check: read the contract directly when possible, so check-in
+// state is correct across devices/browsers, not just this browser's cache.
+async function checkDailyStatus(){
+  if(!walletAddress) return false;
+  const contract = await getContract();
+  if(contract){
+    try{
+      const done = await contract.hasCheckedInToday(walletAddress);
+      if(done) markDailyDone();
+      return done;
+    }catch(e){
+      // fall through to the local cache if the read fails (offline, RPC hiccup, wrong network, etc.)
+    }
+  }
+  return isDailyDoneLocal();
+}
+
+function updateGateUI(){
+  const checkinBtn = document.getElementById('gateCheckinBtn');
+  if(!checkinBtn) return;
+  checkinBtn.disabled = !walletAddress;
+  checkinBtn.textContent = walletAddress ? '📝 Send Daily Check-In' : '📝 Connect wallet first';
+}
+
+async function sendDailyCheckIn(){
+  if(!walletAddress){ showToast('Connect your wallet first'); return; }
+  const onBase = await ensureBaseMainnet();
+  if(!onBase) return;
+  const contract = await getContract();
+  if(!contract){ showToast('Could not reach the contract — check you\'re on Base Mainnet'); return; }
+  try{
+    const tx = await contract.checkIn();
+    showToast('⏳ Confirming check-in…');
+    await tx.wait();
+    markDailyDone();
+    showToast('✅ Daily check-in confirmed!');
+    document.getElementById('dailyGateOverlay').classList.remove('show');
+    gameStarted = true;
+    restart();
+  }catch(e){
+    const msg = ((e && (e.reason || e.shortMessage || e.message)) || '').toLowerCase();
+    if(msg.includes('already checked in')){
+      // Someone else's session (or an earlier tx today) already recorded it — let them in.
+      markDailyDone();
+      showToast('Already checked in today ✅');
+      document.getElementById('dailyGateOverlay').classList.remove('show');
+      gameStarted = true;
+      restart();
+    } else {
+      showToast('Transaction was declined or failed');
+    }
+  }
+}
+
+async function proceedPastGate(){
+  const done = await checkDailyStatus();
+  if(done){
+    gameStarted = true;
+    restart();
+  } else {
+    updateGateUI();
+    document.getElementById('dailyGateOverlay').classList.add('show');
+  }
+}
+
+function startupCheck(){
+  let seenGuide = false;
+  try{ seenGuide = localStorage.getItem('gemfallSeenGuide') === '1'; }catch(e){}
+  if(seenGuide){
+    proceedPastGate();
+  } else {
+    document.getElementById('guideOverlay').classList.add('show');
+  }
+}
+
+document.getElementById('gateConnectBtn').addEventListener('click', async ()=>{
+  await connectWallet();
+  updateGateUI();
+  if(await checkDailyStatus()){
+    document.getElementById('dailyGateOverlay').classList.remove('show');
+    gameStarted = true;
+    restart();
+  }
+});
+document.getElementById('gateCheckinBtn').addEventListener('click', sendDailyCheckIn);
+document.getElementById('gateSkipBtn').addEventListener('click', ()=>{
+  document.getElementById('dailyGateOverlay').classList.remove('show');
+  gameStarted = true;
+  restart();
+});
+
+function buildBoard(){
+  gridEl.innerHTML = '';
+  gridEl.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+  board = [];
+  cellEls = [];
+  for(let r=0;r<ROWS;r++){
+    board.push(new Array(COLS).fill(null));
+    const rowEls = [];
+    for(let c=0;c<COLS;c++){
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      gridEl.appendChild(cell);
+      rowEls.push(cell);
+    }
+    cellEls.push(rowEls);
+  }
+}
+
+function cloneMatrix(m){ return m.map(row=>row.slice()); }
+
+function rotateMatrix(m){
+  const N = m.length;
+  const res = Array.from({length:N}, ()=>new Array(N).fill(0));
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++) res[c][N-1-r] = m[r][c];
+  return res;
+}
+
+// Fair 7-bag randomizer: every type appears exactly once per shuffled bag of 7,
+// so no type is ever more than 12 pieces away from its last appearance.
+function refillBag(){
+  const b = TYPE_KEYS.slice();
+  for(let i=b.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [b[i],b[j]] = [b[j],b[i]];
+  }
+  bag = bag.concat(b);
+}
+
+function nextFromBag(){
+  if(bag.length === 0) refillBag();
+  return bag.shift();
+}
+
+function makePiece(type){
+  const base = shapeDef(type);
+  const m = cloneMatrix(base.m);
+  const N = m.length;
+  return { type, matrix:m, color:base.color, row:0, col:Math.floor((COLS-N)/2) };
+}
+
+// Draws the next bag piece, but has a small independent chance to swap in a
+// power-up piece instead — keeps the 7-bag fair for the standard pieces while
+// still sprinkling in occasional variety.
+function drawNextType(){
+  const drawn = nextFromBag();
+  const roll = Math.random();
+  if(roll < 0.05) return 'BOMB';
+  if(roll < 0.10) return 'RAINBOW';
+  return drawn;
+}
+
+function spawnPiece(){
+  const type = nextType || drawNextType();
+  nextType = drawNextType();
+  active = makePiece(type);
+  canHold = true;
+  lockResets = 0;
+  lastActionRotate = false;
+  clearLockTimer();
+  renderNext();
+  if(collides(active.matrix, active.row, active.col)){
+    endGame(false);
+  }
+}
+
+function collides(matrix, row, col){
+  for(let r=0;r<matrix.length;r++){
+    for(let c=0;c<matrix.length;c++){
+      if(!matrix[r][c]) continue;
+      const absR = row+r, absC = col+c;
+      if(absC<0 || absC>=COLS || absR>=ROWS) return true;
+      if(absR>=0 && board[absR][absC]) return true;
+    }
+  }
+  return false;
+}
+
+function clearLockTimer(){
+  if(lockTimer){ clearTimeout(lockTimer); lockTimer = null; }
+}
+
+function findFullRows(){
+  const rows = [];
+  for(let r=0;r<ROWS;r++){ if(board[r].every(v=>v!==null)) rows.push(r); }
+  return rows;
+}
+
+// Simplified 3-corner T-spin check: a T piece counts as a spin if it locked
+// right after a rotation (not a slide) and at least 3 of the 4 diagonal
+// corners around its pivot are filled or off the board.
+function detectTSpin(){
+  if(!active || active.type !== 'T' || !lastActionRotate) return false;
+  const corners = [[0,0],[0,2],[2,0],[2,2]];
+  let filled = 0;
+  corners.forEach(([cr,cc])=>{
+    const absR = active.row+cr, absC = active.col+cc;
+    if(absR < 0) return;
+    if(absC < 0 || absC >= COLS || absR >= ROWS){ filled++; return; }
+    if(board[absR][absC]) filled++;
+  });
+  return filled >= 3;
+}
+
+function lockPiece(){
+  clearLockTimer();
+
+  if(active.type === 'BOMB'){ handleBombLock(); return; }
+  if(active.type === 'RAINBOW'){ handleRainbowLock(); return; }
+
+  const isTSpin = detectTSpin();
+  for(let r=0;r<active.matrix.length;r++){
+    for(let c=0;c<active.matrix.length;c++){
+      if(!active.matrix[r][c]) continue;
+      const absR = active.row+r, absC = active.col+c;
+      if(absR>=0) board[absR][absC] = active.color;
+    }
+  }
+  finishLock(isTSpin);
+}
+
+function handleBombLock(){
+  const centerR = active.row, centerC = active.col;
+  const affected = [];
+  for(let dr=-1; dr<=1; dr++){
+    for(let dc=-1; dc<=1; dc++){
+      const r = centerR+dr, c = centerC+dc;
+      if(r>=0 && r<ROWS && c>=0 && c<COLS) affected.push([r,c]);
+    }
+  }
+  let cleared = 0;
+  affected.forEach(([r,c])=>{
+    if(board[r][c]) cleared++;
+    board[r][c] = null;
+  });
+  score += cleared*10 + 20;
+  stats.usedBomb = true;
+  showToast('💥 Boom!');
+  sfxBomb();
+  triggerShake();
+  spawnParticles(centerR, centerC, ['#ff9a6a','#ff6b6b','#e8c468']);
+  checkAchievements();
+  updateStats();
+  spawnPiece();
+  render();
+}
+
+function handleRainbowLock(){
+  const r = active.row;
+  for(let c=0;c<COLS;c++){
+    if(!board[r][c]) board[r][c] = shapeDef('RAINBOW').color;
+  }
+  score += 30;
+  stats.usedRainbow = true;
+  showToast('🌈 Rainbow Fill!');
+  sfxRainbow();
+  checkAchievements();
+  finishLock(false);
+}
+
+function finishLock(isTSpin){
+  const fullRows = findFullRows();
+
+  if(fullRows.length === 0){
+    combo = -1;
+    if(isTSpin){
+      score += 100 * level;
+      showToast('T-Spin!');
+      sfxTspin();
+      stats.gotTSpin = true;
+      checkAchievements();
+    } else {
+      score += 4;
+      sfxLock();
+    }
+    updateStats();
+    spawnPiece();
+    render();
+    return;
+  }
+
+  combo++;
+  let base;
+  if(isTSpin){
+    base = [0,800,1200,1600][fullRows.length] || 1600;
+    showToast(fullRows.length===1 ? 'T-Spin Single!' : fullRows.length===2 ? 'T-Spin Double!' : 'T-Spin Triple!');
+    sfxTspin();
+    stats.gotTSpin = true;
+    triggerShake();
+    spawnParticles(fullRows[0], Math.floor(COLS/2), ['#d9a8ff','#8a4fd1','#e8c468']);
+  } else {
+    base = [0,100,300,500,800][fullRows.length] || fullRows.length*250;
+    sfxLineClear(fullRows.length);
+    if(fullRows.length === 4){
+      showToast('Tetris! 🎉');
+      stats.gotTetris = true;
+      triggerShake();
+      spawnParticles(fullRows[Math.floor(fullRows.length/2)], Math.floor(COLS/2), ['#e8c468','#8fd3ff','#9df3bd','#ff9aac']);
+    }
+    else if(fullRows.length === 3) showToast('Triple!');
+    else if(fullRows.length === 2) showToast('Double!');
+    else if(combo > 0) showToast('Combo x' + (combo+1) + '!');
+  }
+  const comboBonus = combo > 0 ? combo * 50 * level : 0;
+  score += base * level + comboBonus;
+  lines += fullRows.length;
+  stats.totalLinesLifetime += fullRows.length;
+  if(combo+1 > stats.maxCombo) stats.maxCombo = combo+1;
+  checkAchievements();
+
+  animating = true;
+  fullRows.forEach(r=>{ for(let c=0;c<COLS;c++) cellEls[r][c].classList.add('clearing'); });
+
+  setTimeout(()=>{
+    const rowsSet = new Set(fullRows);
+    const remaining = board.filter((_, idx)=>!rowsSet.has(idx));
+    const emptyRows = fullRows.map(()=>new Array(COLS).fill(null));
+    board = emptyRows.concat(remaining);
+
+    if(currentMode !== 'sprint'){
+      const newLevel = Math.floor(lines/10) + 1;
+      if(newLevel !== level){
+        level = newLevel;
+        dropInterval = Math.max(110, Math.round(800 * Math.pow(0.88, level-1)));
+        restartTimer();
+        showToast('Level ' + level + '!');
+        sfxLevelUp();
+        spawnParticles(0, Math.floor(COLS/2), ['#e8c468','#fff']);
+      }
+    }
+
+    animating = false;
+    updateStats();
+
+    if(currentMode === 'sprint' && lines >= 40){
+      finishSprint();
+      return;
+    }
+
+    spawnPiece();
+    render();
+  }, 300);
+}
+
+function ghostRow(){
+  let r = active.row;
+  while(!collides(active.matrix, r+1, active.col)) r++;
+  return r;
+}
+
+function render(){
+  const display = board.map(row=>row.slice());
+  const activeCells = [];
+  if(active){
+    const gr = ghostRow();
+    for(let r=0;r<active.matrix.length;r++){
+      for(let c=0;c<active.matrix.length;c++){
+        if(!active.matrix[r][c]) continue;
+        const absR = gr+r, absC = active.col+c;
+        if(absR>=0 && absR<ROWS && absC>=0 && absC<COLS && !display[absR][absC]){
+          display[absR][absC] = 'ghost';
+        }
+      }
+    }
+    for(let r=0;r<active.matrix.length;r++){
+      for(let c=0;c<active.matrix.length;c++){
+        if(!active.matrix[r][c]) continue;
+        const absR = active.row+r, absC = active.col+c;
+        if(absR>=0 && absR<ROWS && absC>=0 && absC<COLS){
+          display[absR][absC] = active.color;
+          activeCells.push([absR,absC]);
+        }
+      }
+    }
+  }
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const val = display[r][c];
+      const el = cellEls[r][c];
+      el.textContent = '';
+      if(val === 'ghost'){
+        el.className = 'cell ghost';
+        el.style.background = '';
+      } else if(val){
+        el.className = 'cell filled';
+        el.style.background = val;
+      } else {
+        el.className = 'cell';
+        el.style.background = '';
+      }
+    }
+  }
+  if(active && (active.type === 'BOMB' || active.type === 'RAINBOW')){
+    const cls = active.type === 'BOMB' ? 'bomb-block' : 'rainbow-block';
+    const icon = active.type === 'BOMB' ? '💣' : '🌈';
+    activeCells.forEach(([r,c])=>{
+      cellEls[r][c].classList.add(cls);
+      cellEls[r][c].textContent = icon;
+    });
+  }
+}
+
+function renderNext(){
+  nextHolder.innerHTML = '';
+  const base = shapeDef(nextType);
+  const N = base.m.length;
+  const px = 14;
+  const wrap = document.createElement('div');
+  wrap.className = 'mini-piece';
+  wrap.style.width = (N*px)+'px';
+  wrap.style.height = (N*px)+'px';
+  const isSpecial = SPECIAL_SHAPES[nextType];
+  for(let r=0;r<N;r++){
+    for(let c=0;c<N;c++){
+      if(!base.m[r][c]) continue;
+      const b = document.createElement('div');
+      b.className = 'mini-block';
+      b.style.left = (c*px)+'px';
+      b.style.top = (r*px)+'px';
+      b.style.width = (px-2)+'px';
+      b.style.height = (px-2)+'px';
+      b.style.background = base.color;
+      if(isSpecial){
+        b.style.display = 'flex';
+        b.style.alignItems = 'center';
+        b.style.justifyContent = 'center';
+        b.style.fontSize = '9px';
+        b.textContent = nextType === 'BOMB' ? '💣' : '🌈';
+      }
+      wrap.appendChild(b);
+    }
+  }
+  nextHolder.appendChild(wrap);
+}
+
+function renderHold(){
+  holdHolder.innerHTML = '';
+  if(holdType === null) return;
+  const base = shapeDef(holdType);
+  const N = base.m.length;
+  const px = 14;
+  const wrap = document.createElement('div');
+  wrap.className = 'mini-piece';
+  wrap.style.width = (N*px)+'px';
+  wrap.style.height = (N*px)+'px';
+  wrap.style.opacity = canHold ? '1' : '0.45';
+  const isSpecial = SPECIAL_SHAPES[holdType];
+  for(let r=0;r<N;r++){
+    for(let c=0;c<N;c++){
+      if(!base.m[r][c]) continue;
+      const b = document.createElement('div');
+      b.className = 'mini-block';
+      b.style.left = (c*px)+'px';
+      b.style.top = (r*px)+'px';
+      b.style.width = (px-2)+'px';
+      b.style.height = (px-2)+'px';
+      b.style.background = base.color;
+      if(isSpecial){
+        b.style.display = 'flex';
+        b.style.alignItems = 'center';
+        b.style.justifyContent = 'center';
+        b.style.fontSize = '9px';
+        b.textContent = holdType === 'BOMB' ? '💣' : '🌈';
+      }
+      wrap.appendChild(b);
+    }
+  }
+  holdHolder.appendChild(wrap);
+}
+
+function formatTime(ms){
+  const total = Math.floor(ms/1000);
+  const m = Math.floor(total/60);
+  const s = total%60;
+  return m + ':' + String(s).padStart(2,'0');
+}
+
+function updateStats(){
+  scoreEl.textContent = score;
+  linesEl.textContent = lines;
+  if(currentMode === 'sprint'){
+    levelEl.textContent = formatTime(Date.now() - sprintStartTime);
+  } else {
+    levelEl.textContent = level;
+  }
+  if(score > best){
+    best = score;
+    bestEl.textContent = best;
+    try{ localStorage.setItem('fallingBlocksBest', String(best)); }catch(e){}
+  }
+  if(level > stats.maxLevel) stats.maxLevel = level;
+  if(score > stats.bestScoreEver) stats.bestScoreEver = score;
+  checkAchievements();
+}
+
+function isGrounded(){
+  return collides(active.matrix, active.row+1, active.col);
+}
+
+function tick(){
+  if(paused || gameOver || animating) return;
+  if(!isGrounded()){
+    active.row++;
+    clearLockTimer();
+  } else if(!lockTimer){
+    lockTimer = setTimeout(()=>{ lockTimer = null; lockPiece(); }, LOCK_DELAY);
+  }
+  render();
+}
+
+// Any successful move/rotate while resting on something gives the player a brief
+// extra window before the piece locks — this is what makes rotating flush
+// against a wall or the floor actually work instead of failing at random.
+function refreshLockTimer(){
+  if(!isGrounded()){ clearLockTimer(); return; }
+  if(lockTimer && lockResets < MAX_LOCK_RESETS){
+    clearLockTimer();
+    lockResets++;
+    lockTimer = setTimeout(()=>{ lockTimer = null; lockPiece(); }, LOCK_DELAY);
+  } else if(!lockTimer){
+    lockTimer = setTimeout(()=>{ lockTimer = null; lockPiece(); }, LOCK_DELAY);
+  }
+}
+
+function restartTimer(){
+  clearInterval(timer);
+  timer = setInterval(tick, dropInterval);
+}
+
+function moveHorizontal(dir){
+  if(paused || gameOver || animating || !active) return;
+  if(!collides(active.matrix, active.row, active.col+dir)){
+    active.col += dir;
+    lastActionRotate = false;
+    refreshLockTimer();
+    sfxMove();
+    render();
+  }
+}
+
+function softDrop(){
+  if(paused || gameOver || animating || !active) return;
+  if(!isGrounded()){
+    active.row++;
+    score += 1;
+    lastActionRotate = false;
+    clearLockTimer();
+    updateStats();
+    render();
+  } else if(!lockTimer){
+    lockTimer = setTimeout(()=>{ lockTimer = null; lockPiece(); }, LOCK_DELAY);
+  }
+}
+
+function hardDrop(){
+  if(paused || gameOver || animating || !active) return;
+  clearLockTimer();
+  let dist = 0;
+  while(!collides(active.matrix, active.row+1, active.col)){
+    active.row++;
+    dist++;
+  }
+  lastActionRotate = false;
+  score += dist*2;
+  sfxHardDrop();
+  lockPiece();
+}
+
+// Simplified wall-kick offsets (row, col): try the spot in place, then a few
+// sideways and upward nudges — this is what lets a piece rotate near a wall,
+// in a corner, or with its bottom row already touching the stack, instead of
+// the rotation just silently failing like a plain matrix-rotate would.
+const KICKS_I = [[0,0],[0,-2],[0,2],[0,-1],[0,1],[-1,0],[-1,-2],[-1,2]];
+const KICKS_STD = [[0,0],[0,-1],[0,1],[-1,0],[0,-2],[0,2],[-1,-1],[-1,1]];
+
+function rotate(){
+  if(paused || gameOver || animating || !active || active.type === 'O' || SPECIAL_SHAPES[active.type]) return;
+  const rotated = rotateMatrix(active.matrix);
+  const kicks = active.type === 'I' ? KICKS_I : KICKS_STD;
+  for(const [dr,dc] of kicks){
+    if(!collides(rotated, active.row+dr, active.col+dc)){
+      active.matrix = rotated;
+      active.row += dr;
+      active.col += dc;
+      lastActionRotate = true;
+      refreshLockTimer();
+      sfxRotate();
+      render();
+      return;
+    }
+  }
+}
+
+function holdPiece(){
+  if(paused || gameOver || animating || !active || !canHold) return;
+  clearLockTimer();
+  sfxHold();
+  if(holdType === null){
+    holdType = active.type;
+    spawnPiece();
+  } else {
+    const swapType = holdType;
+    holdType = active.type;
+    active = makePiece(swapType);
+    if(collides(active.matrix, active.row, active.col)){
+      endGame(false);
+    }
+  }
+  canHold = false;
+  lockResets = 0;
+  renderHold();
+  render();
+}
+
+function endGame(win){
+  gameOver = true;
+  animating = false;
+  clearInterval(timer);
+  clearLockTimer();
+  clearHeldTimers();
+  clearInterval(sprintInterval);
+  clearInterval(obstacleInterval);
+  heldKey = null;
+  sfxGameOver();
+  overlayTitle.textContent = 'Game Over';
+  overlayMsg.textContent = (score > 0 && score >= best) ? 'New best score! 🎉' : 'The stack reached the top.';
+  finalScoreEl.textContent = score;
+  const modeLabel = currentMode === 'sprint' ? 'Sprint' : currentMode === 'obstacles' ? 'Endless+' : 'Marathon';
+  const { top, rank } = saveLeaderboardEntry(score, modeLabel);
+  renderLeaderboardList(top, rank);
+  checkAchievements();
+  overlayEl.classList.add('show');
+}
+
+function finishSprint(){
+  gameOver = true;
+  animating = false;
+  clearInterval(timer);
+  clearLockTimer();
+  clearHeldTimers();
+  clearInterval(sprintInterval);
+  heldKey = null;
+  const elapsed = Date.now() - sprintStartTime;
+  sfxAchievement();
+  overlayTitle.textContent = 'Sprint Complete! 🏁';
+  overlayMsg.textContent = 'You cleared 40 lines in ' + formatTime(elapsed) + '.';
+  finalScoreEl.textContent = score;
+  const { top, rank } = saveLeaderboardEntry(score, 'Sprint');
+  renderLeaderboardList(top, rank);
+  checkAchievements();
+  overlayEl.classList.add('show');
+}
+
+// Endless+ mode: every 20s a garbage row rises from the bottom with one gap —
+// keeps an otherwise-endless game escalating without just speeding up drops.
+function injectGarbageRow(){
+  if(paused || gameOver || animating) return;
+  board.shift();
+  const gapCol = Math.floor(Math.random()*COLS);
+  const garbageRow = new Array(COLS).fill('linear-gradient(135deg, #6b6f95, #454a72)');
+  garbageRow[gapCol] = null;
+  board.push(garbageRow);
+  showToast('⚠️ Obstacle Rising!');
+  sfxBomb();
+  triggerShake();
+  render();
+  if(active && collides(active.matrix, active.row, active.col)){
+    endGame(false);
+  }
+}
+
+function togglePause(){
+  if(gameOver) return;
+  paused = !paused;
+  if(paused){
+    clearLockTimer(); // otherwise a piece could still lock itself in while "paused"
+    clearHeldTimers();
+    heldKey = null;
+  }
+  pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+  document.getElementById('boardWrap').classList.toggle('paused', paused);
+}
+
+function restart(mode){
+  if(mode) currentMode = mode;
+  overlayEl.classList.remove('show');
+  clearInterval(timer);
+  clearLockTimer();
+  clearHeldTimers();
+  clearInterval(sprintInterval);
+  clearInterval(obstacleInterval);
+  heldKey = null;
+  score = 0; lines = 0; level = 1; paused = false; gameOver = false;
+  dropInterval = 800;
+  bag = [];
+  holdType = null; canHold = true; lockResets = 0;
+  combo = -1; lastActionRotate = false; animating = false;
+  pauseBtn.textContent = 'Pause';
+  document.getElementById('boardWrap').classList.remove('paused');
+
+  document.querySelectorAll('.mode-tab').forEach(t=>t.classList.toggle('active', t.dataset.mode === currentMode));
+  document.getElementById('levelLabel').textContent = currentMode === 'sprint' ? 'Time' : 'Level';
+
+  buildBoard();
+  renderHold();
+  nextType = nextFromBag();
+  spawnPiece();
+  updateStats();
+  render();
+  restartTimer();
+
+  if(currentMode === 'sprint'){
+    sprintStartTime = Date.now();
+    sprintInterval = setInterval(()=>{ if(!paused && !gameOver) levelEl.textContent = formatTime(Date.now()-sprintStartTime); }, 500);
+  } else if(currentMode === 'obstacles'){
+    obstacleInterval = setInterval(injectGarbageRow, 20000);
+  }
+}
+
+document.querySelectorAll('.mode-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>restart(tab.dataset.mode));
+});
+document.getElementById('achvBtn').addEventListener('click', ()=>{
+  renderAchievements();
+  document.getElementById('achvOverlay').classList.add('show');
+});
+document.getElementById('achvCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('achvOverlay').classList.remove('show');
+});
+
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  renderThemeList();
+  document.getElementById('themeOverlay').classList.add('show');
+});
+document.getElementById('themeCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('themeOverlay').classList.remove('show');
+});
+
+let gameStarted = false;
+function closeGuide(){
+  document.getElementById('guideOverlay').classList.remove('show');
+  try{ localStorage.setItem('gemfallSeenGuide', '1'); }catch(e){}
+  if(!gameStarted){
+    proceedPastGate();
+  }
+}
+document.getElementById('guideBtn').addEventListener('click', ()=>{
+  document.getElementById('guideOverlay').classList.add('show');
+});
+document.getElementById('guideCloseBtn').addEventListener('click', closeGuide);
+
+// Press-and-hold auto-repeat: an initial delay (DAS) before the move starts
+// repeating, then a fast steady rate (ARR) — this is what makes holding a
+// direction actually slide the piece instead of moving it once per tap.
+const DAS_DELAY = 170;
+const ARR_RATE = 45;
+let dasTimeout = null, arrInterval = null;
+
+function clearHeldTimers(){
+  if(dasTimeout){ clearTimeout(dasTimeout); dasTimeout = null; }
+  if(arrInterval){ clearInterval(arrInterval); arrInterval = null; }
+}
+
+function startHeld(action){
+  action();
+  clearHeldTimers();
+  dasTimeout = setTimeout(()=>{
+    arrInterval = setInterval(action, ARR_RATE);
+  }, DAS_DELAY);
+}
+
+function bindHold(el, action){
+  el.addEventListener('pointerdown', (e)=>{ e.preventDefault(); startHeld(action); });
+  ['pointerup','pointerleave','pointercancel'].forEach(evt=>el.addEventListener(evt, clearHeldTimers));
+}
+
+bindHold(document.getElementById('leftBtn'), ()=>moveHorizontal(-1));
+bindHold(document.getElementById('rightBtn'), ()=>moveHorizontal(1));
+bindHold(document.getElementById('downBtn'), softDrop);
+document.getElementById('rotateBtn').addEventListener('click', rotate);
+document.getElementById('dropBtn').addEventListener('click', hardDrop);
+document.getElementById('holdBtn').addEventListener('click', holdPiece);
+pauseBtn.addEventListener('click', togglePause);
+document.getElementById('restartBtn').addEventListener('click', ()=>restart());
+document.getElementById('playAgainBtn').addEventListener('click', ()=>restart());
+
+const REPEATABLE_KEYS = { ArrowLeft: ()=>moveHorizontal(-1), ArrowRight: ()=>moveHorizontal(1), ArrowDown: softDrop };
+let heldKey = null;
+
+window.addEventListener('keydown', (e)=>{
+  if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' '].includes(e.key)) e.preventDefault();
+
+  if(REPEATABLE_KEYS[e.key]){
+    if(e.repeat || heldKey === e.key) return; // ignore the OS's own key-repeat, we drive repeat ourselves
+    heldKey = e.key;
+    startHeld(REPEATABLE_KEYS[e.key]);
+    return;
+  }
+  if(e.key === 'ArrowUp') rotate();
+  else if(e.key === ' ') hardDrop();
+  else if(e.key === 'c' || e.key === 'C' || e.key === 'Shift') holdPiece();
+  else if(e.key === 'p' || e.key === 'P') togglePause();
+});
+
+window.addEventListener('keyup', (e)=>{
+  if(REPEATABLE_KEYS[e.key] && heldKey === e.key){
+    heldKey = null;
+    clearHeldTimers();
+  }
+});
+
+document.body.addEventListener('click', ()=>document.body.focus());
+document.body.focus();
+window.addEventListener('load', ()=>document.body.focus());
+
+applyTheme(currentTheme, true);
+</script>
+</body>
+</html>
