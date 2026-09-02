@@ -1026,15 +1026,24 @@ async function ensureBaseMainnet(){
   }
 }
 
-async function getContract(){
+// Base Builder Code attribution (ERC-8021) — appended to check-in calldata so
+// Base can attribute this app's transactions back to it. bc_qn0gkyzu
+const BUILDER_DATA_SUFFIX = '0x62635f716e30676b797a750b0080218021802180218021802180218021';
+
+async function getSigner(){
   if(!window.ethers || !window.ethereum || !walletAddress) return null;
   try{
     const provider = new ethers.BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-    return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+    return await provider.getSigner();
   }catch(e){
     return null;
   }
+}
+
+async function getContract(){
+  const signer = await getSigner();
+  if(!signer) return null;
+  return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 }
 
 // ---- Daily check-in (required once per day to start playing) ----
@@ -1076,10 +1085,13 @@ async function sendDailyCheckIn(){
   if(!walletAddress){ showToast('Connect your wallet first'); return; }
   const onBase = await ensureBaseMainnet();
   if(!onBase) return;
-  const contract = await getContract();
-  if(!contract){ showToast('Could not reach the contract — check you\'re on Base Mainnet'); return; }
+  const signer = await getSigner();
+  if(!signer){ showToast('Could not reach the contract — check you\'re on Base Mainnet'); return; }
   try{
-    const tx = await contract.checkIn();
+    const iface = new ethers.Interface(CONTRACT_ABI);
+    const callData = iface.encodeFunctionData('checkIn');
+    const data = callData + BUILDER_DATA_SUFFIX.slice(2); // append ERC-8021 attribution suffix
+    const tx = await signer.sendTransaction({ to: CONTRACT_ADDRESS, data });
     showToast('⏳ Confirming check-in…');
     await tx.wait();
     markDailyDone();
